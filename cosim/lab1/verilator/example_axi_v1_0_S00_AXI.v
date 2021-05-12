@@ -85,7 +85,7 @@
 	// AXI4LITE signals
 	reg [C_S_AXI_ADDR_WIDTH-1 : 0] 	axi_awaddr;
 	reg  	axi_awready;
-	reg  	axi_wready;
+	reg  	axi_wready;slv_rd_sel_one_hot
 	reg [1 : 0] 	axi_bresp;
 	reg  	axi_bvalid;
 	reg [C_S_AXI_ADDR_WIDTH-1 : 0] 	axi_araddr;
@@ -101,18 +101,33 @@
 	// ADDR_LSB = 3 for 64 bits (n downto 3)
 	localparam integer ADDR_LSB = (C_S_AXI_DATA_WIDTH/32) + 1;
 	localparam integer OPT_MEM_ADDR_BITS = 1;
+	
+	//--------------------------------------------------------------------------------
+	// USER MODIFY -- Configure your accelerator interface by setting these parameters
+	//--------------------------------------------------------------------------------
+	//
+	// Change these parameters to change the number of CSRs, input FIFOs and output FIFOs.
+	//
+	// note: we automatically create a "elements avail" CSR for the input FIFO
+	//       and a "free space avail" csr for each output FIFO
+	//
+	// if the PS reads from the FIFO and it is empty, it will return bogus data.
+	// if the PS writes to a FIFO and it is full, it will be dropped.
+	//
+	// reading the FIFO csrs tells you how many consecutive words you can read/write before
+	// checking the csr again/
+
+	localparam num_regs_lp = 4;         // number of user CSRs
+	localparam num_fifo_in_lp = 1;      // number of input FIFOs (from PL to PS)
+	localparam num_fifo_out_lp = 1;     // number of output FIFOs (from PS to PL)
+
+
 	//----------------------------------------------
 	//-- Signals for user logic register space example
 	//------------------------------------------------
-	//-- Number of Slave Registers 4
-	reg [C_S_AXI_DATA_WIDTH-1:0]	slv_reg0;
-	reg [C_S_AXI_DATA_WIDTH-1:0]	slv_reg1;
-	reg [C_S_AXI_DATA_WIDTH-1:0]	slv_reg2;
-	reg [C_S_AXI_DATA_WIDTH-1:0]	slv_reg3;
 	wire	 slv_reg_rden;
 	wire	 slv_reg_wren;
 	reg [C_S_AXI_DATA_WIDTH-1:0]	 reg_data_out;
-	logic [C_S_AXI_DATA_WIDTH-1:0]     pl_ps_data_out;
 	integer	 byte_index;
 	reg	 aw_en;
 
@@ -224,7 +239,9 @@
 	logic ready_o;
 
 	wire yumi_i;
-	assign yumi_i = slv_reg_rden && axi_araddr == 4'hc; // ps requesting a read
+	logic ps_read_addr; 
+	assign ps_read_addr = axi_araddr == 4'hc;
+	assign yumi_i = slv_reg_rden && ps_read_addr; // ps requesting a read
 
         bsg_fifo_1r1w_small #(.width_p(C_S_AXI_DATA_WIDTH), .els_p(2)) ps_pl_fifo
 	  (.clk_i(S_AXI_ACLK)
@@ -238,20 +255,20 @@
 	   ,.yumi_i(yumi_i) // ps requesting a read
 	   );
 
-	bsg_fifo_1r1w_small #(.width_p(C_S_AXI_DATA_WIDTH), .els_p(2)) pl_ps_fifo
-          (.clk_i(S_AXI_ACLK)
-           ,.reset_i(~S_AXI_ARESETN)
-           ,.v_i(ps_pl_v_o && pl_ps_fifo_ctr != 0)
-           ,.ready_o(slv_reg_rden && axi_araddr == 4'hc) //axi_wready)
-           ,.data_i(connect_fifos)
+	//bsg_fifo_1r1w_small #(.width_p(C_S_AXI_DATA_WIDTH), .els_p(2)) pl_ps_fifo
+        //  (.clk_i(S_AXI_ACLK)
+        //   ,.reset_i(~S_AXI_ARESETN)
+        //   ,.v_i(ps_pl_v_o && pl_ps_fifo_ctr != 0)
+        //   ,.ready_o(slv_reg_rden && ps_read_addr) 
+        //   ,.data_i(connect_fifos)
 
-           ,.v_o(pl_ps_v_o)
-           ,.data_o(pl_ps_data_out)
-           ,.yumi_i(yumi_i) // ps requesting a read
-           );
+        //   ,.v_o(pl_ps_v_o)
+        //   ,.data_o(pl_ps_data_out)
+        //   ,.yumi_i(yumi_i) // ps requesting a read
+        //   );
 	
 	localparam num_ps_pl_fifo_lp = 2;
-	wire [C_S_AXI_DATA_WIDTH-1:0] ps_pl_fifo_ctr; //num_ps_pl_fifo_lp C_S_AXI_ADDR_WIDTH
+	wire [num_ps_pl_fifo_lp-1:0] ps_pl_fifo_ctr; //num_ps_pl_fifo_lp C_S_AXI_DATA_WIDTH
 	bsg_flow_counter #(.els_p(2)
 			  ,.count_free_p(0)
 			  ) ps_pl_counter
@@ -264,7 +281,7 @@
 	  );
 
 	localparam num_pl_ps_fifo_lp = 2;
-        wire [C_S_AXI_DATA_WIDTH-1:0] pl_ps_fifo_ctr;
+        wire [num_ps_pl_fifo_lp-1:0] pl_ps_fifo_ctr;
 	bsg_flow_counter #(.els_p(2)
                           ,.count_free_p(0)
                           ) pl_ps_counter
@@ -315,7 +332,7 @@
 	  if ( S_AXI_ARESETN == 1'b0 )
 	    begin
 	      axi_arready <= 1'b0;
-	      axi_araddr  <= 4'b0;
+	      axi_araddr  <= 0;
 	    end 
 	  else
 	    begin    
@@ -368,19 +385,17 @@
 	// Slave register read enable is asserted when valid address is available
 	// and the slave is ready to accept the read address.
 	assign slv_reg_rden = axi_arready & S_AXI_ARVALID & ~axi_rvalid;
-	always @(*)
-	begin
-	      if (slv_reg_rden && ( num_pl_ps_fifo_lp - pl_ps_fifo_ctr == 0))
-	        begin
-		  pl_ps_data_out <= -1;
-	        end
-	      case (axi_araddr) 
-               4'h0 : reg_data_out <= ps_pl_fifo_ctr;
-	       4'h8 : reg_data_out <= num_pl_ps_fifo_lp - pl_ps_fifo_ctr;
-	       4'hc : reg_data_out <= pl_ps_data_out;
-	       default : reg_data_out <= -1; // if no read is possible
-	      endcase
-	end
+
+	// output read by PS in the following order
+	// 0: input fifo # of free spots
+	// 8: output fifo # of elements
+	// C: output fifo head
+	// .data_i({out_fifo_data_r, out_fifo_ctrs_full, 4'hx, in_fifo_ctrs_free})
+        bsg_mux_one_hot #(.width_p(C_S_AXI_DATA_WIDTH),.els_p(read_addr_bit_width_lp)) muxoh
+	  (.data_i({in_fifo_ctrs_full, out_fifo_ctrs_full, out_fifo_data_r, slv_r})
+	   ,.sel_one_hot_i(slv_rd_sel_one_hot)
+	   ,.data_o(reg_data_out)
+	   );
 
 	// Output register or memory read data
 	always @( posedge S_AXI_ACLK )
