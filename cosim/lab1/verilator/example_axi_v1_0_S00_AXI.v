@@ -234,26 +234,138 @@
 	
 	assign slv_reg_wren = axi_wready && S_AXI_WVALID && axi_awready && S_AXI_AWVALID;
 
-	wire [C_S_AXI_DATA_WIDTH-1 : 0] connect_fifos;
-	wire ps_pl_v_o, pl_ps_v_o;
-	logic ready_o;
+	genvar k;
 
-	wire yumi_i;
-	logic ps_read_addr; 
-	assign ps_read_addr = axi_araddr == 4'hc;
-	assign yumi_i = slv_reg_rden && ps_read_addr; // ps requesting a read
+        // this correspond to the number of word addresses that can be read by PS
+        localparam read_addr_bit_width_lp = num_fifo_out_lp+num_fifo_in_lp+num_fifo_out_lp;
 
-        bsg_fifo_1r1w_small #(.width_p(C_S_AXI_DATA_WIDTH), .els_p(2)) ps_pl_fifo
+        // this corresponds to the number of addresses that can be written by PS
+        localparam write_addr_bit_width_lp = num_fifo_in_lp;
+
+        wire [read_addr_bit_width_lp-1:0] slv_rd_sel_one_hot;
+        wire [write_addr_bit_width_lp-1:0]  slv_wr_sel_one_hot;
+
+        bsg_decode_with_v #(.num_out_p(read_addr_bit_width_lp)) decode_rd
+          (.i(axi_araddr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB])
+           ,.v_i(slv_reg_rden)
+           ,.o(slv_rd_sel_one_hot)
+           );
+
+	bsg_decode_with_v #(.num_out_p(write_addr_bit_width_lp)) decode_wr
+         (.i(axi_awaddr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB])
+          ,.v_i(slv_reg_wren)
+          ,.o(slv_wr_sel_one_hot)
+          );
+
+
+	wire in_fifo_ready_lo, in_fifo_valid_lo, in_fifo_yumi_li, in_fifo_valid_li;
+        wire [C_S_AXI_DATA_WIDTH-1:0] in_fifo_data_lo;
+        wire [`BSG_WIDTH(4)-1:0]    in_fifo_ctrs;
+        wire [C_S_AXI_DATA_WIDTH-1:0]    in_fifo_ctrs_full;
+
+
+	assign in_fifo_ctrs_full = (C_S_AXI_DATA_WIDTH) ' (in_fifo_ctrs);
+
+	assign in_fifo_valid_li = in_fifo_ready_lo & slv_wr_sel_one_hot[0];
+
+	bsg_fifo_1r1w_small #(.width_p(C_S_AXI_DATA_WIDTH), .els_p(4)) fifo
 	  (.clk_i(S_AXI_ACLK)
 	   ,.reset_i(~S_AXI_ARESETN)
-	   ,.v_i(slv_reg_wren && ps_pl_fifo_ctr != 0)
-	   ,.ready_o(ready_o) //axi_wready)
+	   ,.v_i(in_fifo_valid_li)
+	   ,.ready_o(in_fifo_ready_lo)
 	   ,.data_i(S_AXI_WDATA)
-	   
-	   ,.v_o(ps_pl_v_o)
-	   ,.data_o(connect_fifos)
-	   ,.yumi_i(yumi_i) // ps requesting a read
+
+	   ,.v_o(in_fifo_valid_lo)
+	   ,.data_o(in_fifo_data_lo)
+	   ,.yumi_i(in_fifo_yumi_li)
 	   );
+
+	always @(negedge S_AXI_ACLK)
+	  begin
+	     assert(~S_AXI_ARESETN | ~slv_wr_sel_one_hot[0] | in_fifo_ready_lo)
+	       else $error("write to full fifo");
+	  end
+
+        bsg_flow_counter #(.els_p(4)
+ 			  ,.count_free_p(1)
+ 			  ) bfc
+ 	 (.clk_i(S_AXI_ACLK)
+ 	  ,.reset_i(~S_AXI_ARESETN)
+ 	  ,.v_i(in_fifo_valid_li)
+ 	  ,.ready_i(in_fifo_ready_lo)
+ 	  ,.yumi_i(in_fifo_yumi_li)
+ 	  ,.count_o(in_fifo_ctrs)
+ 	  );
+
+	logic [C_S_AXI_DATA_WIDTH-1:0] out_fifo_data_r, out_fifo_data_li;
+        logic  			       out_fifo_valid_lo, out_fifo_ready_lo, out_fifo_valid_li, out_fifo_yumi_li;
+        logic [`BSG_WIDTH(4)-1:0]      out_fifo_ctrs;
+        logic [C_S_AXI_DATA_WIDTH-1:0] out_fifo_ctrs_full;
+
+
+	assign out_fifo_data_li = in_fifo_data_lo;
+	assign out_fifo_valid_li = in_fifo_valid_lo;
+
+	assign in_fifo_yumi_li = out_fifo_valid_li & out_fifo_ready_lo;
+
+	assign out_fifo_ctrs_full = (C_S_AXI_DATA_WIDTH) ' (out_fifo_ctrs);
+
+
+	assign out_fifo_yumi_li = out_fifo_valid_lo & slv_rd_sel_one_hot[2];
+
+	bsg_fifo_1r1w_small #(.width_p(C_S_AXI_DATA_WIDTH), .els_p(4)) fifo
+	  (.clk_i(S_AXI_ACLK)
+	   ,.reset_i(~S_AXI_ARESETN)
+	   ,.v_i(out_fifo_valid_li)
+	   ,.ready_o(out_fifo_ready_lo)
+
+	   ,.data_i(out_fifo_data_li)
+
+	   ,.v_o(out_fifo_valid_lo)
+	   ,.data_o(out_fifo_data_r)
+	   // only deque if it is not empty =)
+	   ,.yumi_i(out_fifo_valid_lo & slv_rd_sel_one_hot[2])
+	   );
+
+        bsg_flow_counter #(.els_p(4)
+ 			  ,.count_free_p(0)
+ 			  ) bfc
+ 	 (.clk_i(S_AXI_ACLK)
+ 	  ,.reset_i(~S_AXI_ARESETN)
+ 	  ,.v_i(out_fifo_valid_li)
+ 	  ,.ready_i(out_fifo_ready_lo)
+ 	  ,.yumi_i(out_fifo_yumi_li)
+ 	  ,.count_o(out_fifo_ctrs)
+ 	  );
+ 
+ 	always @(negedge S_AXI_ACLK)
+ 	  begin
+ 	     assert(~S_AXI_ARESETN | ~slv_rd_sel_one_hot[2] | out_fifo_valid_lo)
+ 	       else $error("read from empty fifo");
+ 
+ 	  end
+
+
+	// wire [C_S_AXI_DATA_WIDTH-1 : 0] connect_fifos;
+	// wire ps_pl_v_o, pl_ps_v_o;
+	// logic ready_o;
+
+	// wire yumi_i;
+	// logic ps_read_addr; 
+	// assign ps_read_addr = axi_araddr == 4'hc;
+	// assign yumi_i = slv_reg_rden && ps_read_addr; // ps requesting a read
+
+        // bsg_fifo_1r1w_small #(.width_p(C_S_AXI_DATA_WIDTH), .els_p(2)) ps_pl_fifo
+	//   (.clk_i(S_AXI_ACLK)
+	//    ,.reset_i(~S_AXI_ARESETN)
+	//    ,.v_i(slv_reg_wren && ps_pl_fifo_ctr != 0)
+	//    ,.ready_o(ready_o) //axi_wready)
+	//    ,.data_i(S_AXI_WDATA)
+	//    
+	//    ,.v_o(ps_pl_v_o)
+	//    ,.data_o(connect_fifos)
+	//    ,.yumi_i(yumi_i) // ps requesting a read
+	//    );
 
 	//bsg_fifo_1r1w_small #(.width_p(C_S_AXI_DATA_WIDTH), .els_p(2)) pl_ps_fifo
         //  (.clk_i(S_AXI_ACLK)
