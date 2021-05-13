@@ -234,10 +234,8 @@
 	
 	assign slv_reg_wren = axi_wready && S_AXI_WVALID && axi_awready && S_AXI_AWVALID;
 
-	genvar k;
-
         // this correspond to the number of word addresses that can be read by PS
-        localparam read_addr_bit_width_lp = num_fifo_out_lp+num_fifo_in_lp+num_fifo_out_lp;
+        localparam read_addr_bit_width_lp = num_fifo_out_lp+num_fifo_in_lp+num_fifo_out_lp+1; // plus 1 for no data at addr 4
 
         // this corresponds to the number of addresses that can be written by PS
         localparam write_addr_bit_width_lp = num_fifo_in_lp;
@@ -301,7 +299,7 @@
 	logic [C_S_AXI_DATA_WIDTH-1:0] out_fifo_data_r, out_fifo_data_li;
         logic  			       out_fifo_valid_lo, out_fifo_ready_lo, out_fifo_valid_li, out_fifo_yumi_li;
         logic [`BSG_WIDTH(4)-1:0]      out_fifo_ctrs;
-        logic [C_S_AXI_DATA_WIDTH-1:0] out_fifo_ctrs_full;
+        logic [C_S_AXI_DATA_WIDTH-1:0] out_fifo_ctrs_full, out_fifo_ctrs_free;
 
 
 	assign out_fifo_data_li = in_fifo_data_lo;
@@ -310,9 +308,10 @@
 	assign in_fifo_yumi_li = out_fifo_valid_li & out_fifo_ready_lo;
 
 	assign out_fifo_ctrs_full = (C_S_AXI_DATA_WIDTH) ' (out_fifo_ctrs);
+	assign out_fifo_ctrs_free = 4 - out_fifo_ctrs_full;
 
 
-	assign out_fifo_yumi_li = out_fifo_valid_lo & slv_rd_sel_one_hot[2];
+	assign out_fifo_yumi_li = out_fifo_valid_lo & slv_rd_sel_one_hot[4:3]; 
 
 	bsg_fifo_1r1w_small #(.width_p(C_S_AXI_DATA_WIDTH), .els_p(4)) fifo_o
 	  (.clk_i(S_AXI_ACLK)
@@ -322,10 +321,10 @@
 
 	   ,.data_i(out_fifo_data_li)
 
-	   ,.v_o(out_fifo_valid_lo)
+	   ,.v_o(out_fifo_valid_lo)  
 	   ,.data_o(out_fifo_data_r)
-	   // only deque if it is not empty =)
-	   ,.yumi_i(out_fifo_valid_lo & slv_rd_sel_one_hot[2])
+	   // only deque if it is not empty =) and there is a read request at address 12
+	   ,.yumi_i(out_fifo_valid_lo & slv_rd_sel_one_hot[4:3])
 	   );
 
         bsg_flow_counter #(.els_p(4)
@@ -341,7 +340,7 @@
  
  	always @(negedge S_AXI_ACLK)
  	  begin
- 	     assert(~S_AXI_ARESETN | ~slv_rd_sel_one_hot[2] | out_fifo_valid_lo)
+ 	     assert(~S_AXI_ARESETN | ~slv_rd_sel_one_hot[4:3] | out_fifo_valid_lo)
  	       else $error("read from empty fifo"); // out_fifo_data_r <= -1;
  
  	  end
@@ -449,7 +448,7 @@
 	// C: output fifo head
 	// .data_i({out_fifo_data_r, out_fifo_ctrs_full, 4'hx, in_fifo_ctrs_free})
         bsg_mux_one_hot #(.width_p(C_S_AXI_DATA_WIDTH),.els_p(read_addr_bit_width_lp)) muxoh
-	  (.data_i({out_fifo_data_r, out_fifo_ctrs_full, 4'hx, in_fifo_ctrs_free})
+	  (.data_i({out_fifo_data_r, out_fifo_ctrs_full, in_fifo_ctrs_full, out_fifo_ctrs_free}) //in_fifo_ctrs_free}) 32'hx
 	   ,.sel_one_hot_i(slv_rd_sel_one_hot)
 	   ,.data_o(reg_data_out)
 	   );
@@ -467,9 +466,14 @@
 	      // acceptance of read address by the slave (axi_arready), 
 	      // output the read dada 
 	      if (slv_reg_rden)
-	        begin
-	          axi_rdata <= reg_data_out;     // register read data
-	        end   
+                if (~out_fifo_valid_lo & slv_rd_sel_one_hot[4:3])
+		  begin
+			axi_rdata <= -32'h1; // send -1 if output fifo is empty
+		  end
+		else
+	          begin
+	            axi_rdata <= reg_data_out;     // register read data
+	          end   
 	    end
 	end    
 

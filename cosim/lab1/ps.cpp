@@ -20,28 +20,39 @@ int main(int argc, char **argv) {
 	int mask1 = 0xf;
 	int mask2 = 0xf;
 	
-	// zpl->axil_write(0x0 + ADDR_BASE, val1, mask1);
-	// zpl->axil_write(0x4 + ADDR_BASE, val2, mask2);
 
-	// read address 0 to get how many free spots are available
-        //
-        // send one item
-        //
-        // read address and make sure it decrements by one
-	assert( zpl->axil_read(0x0 + ADDR_BASE) == 2);
+	// Testig for Lab 1
 	
+	// Start with an input fifo of size 4 that's empty
+	assert( zpl->axil_read(0x0 + ADDR_BASE) == 4);
+	
+	// Write to input fifo
 	zpl->axil_write(0x4 + ADDR_BASE, val1, mask1);
-	assert( zpl->axil_read(0x0 + ADDR_BASE) == 1);
+	// Input fifo size decrements by 1
+	assert( zpl->axil_read(0x0 + ADDR_BASE) == 3);
 
+	// Another write to input fifo
 	zpl->axil_write(0x4 + ADDR_BASE, val2, mask2);
-	assert( zpl->axil_read(0x0 + ADDR_BASE) == 0);
+	// Size decrements by one again
+	assert( zpl->axil_read(0x0 + ADDR_BASE) == 2);
 
-	assert( (zpl->axil_read(0x12 + ADDR_BASE) == (val1)));
+	// Check that output fifo has the two items we sent to PL
+	assert( zpl->axil_read(0x8 + ADDR_BASE) == 2);
+	// Read item from output fifo
+	assert( (zpl->axil_read(0xC + ADDR_BASE) == (val1)));
+	// output fifo has only one item left
 	assert( zpl->axil_read(0x8 + ADDR_BASE) == 1);
+	// input fifo size up to 3
+	assert( zpl->axil_read(0x0 + ADDR_BASE) == 3);
 
-	assert( (zpl->axil_read(0x12 + ADDR_BASE) == (val2)));
+	// Read again from output fifo
+	assert( (zpl->axil_read(0xC + ADDR_BASE) == (val2)));
+	// output fifo is empty
         assert( zpl->axil_read(0x8 + ADDR_BASE) == 0);
+	// input fifo is empty
+	assert( zpl->axil_read(0x0 + ADDR_BASE) == 4);
 
+	assert( (zpl->axil_read(0xC + ADDR_BASE) == (-1)));
 	// assert( (zpl->axil_read(0x0 + ADDR_BASE) == (val1)));
 	// assert( (zpl->axil_read(0x4 + ADDR_BASE) == (val2)));
 	
