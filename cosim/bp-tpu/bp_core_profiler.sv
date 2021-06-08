@@ -259,44 +259,39 @@ module bp_core_profiler
      );
   assign stall_reason_enum = bp_stall_reason_e'(stall_reason_lo);
 
-  int stall_hist [bp_stall_reason_e];
-  always_ff @(posedge clk_i)
-    if (~reset_i & ~freeze_i & ~commit_pkt_r.instret)
-      stall_hist[stall_reason_enum] <= stall_hist[stall_reason_enum] + 1'b1;
-
-  integer file;
-  string file_name;
   wire reset_li = reset_i | freeze_i;
-  always_ff @(negedge reset_li)
-    begin
-      file_name = $sformatf("%s_%x.trace", stall_trace_file_p, mhartid_i);
-      file      = $fopen(file_name, "w");
-      $fwrite(file, "%s,%s,%s,%s,%s\n", "cycle", "x", "y", "pc", "operation");
-    end
 
-  wire x_cord_li = '0;
-  wire y_cord_li = '0;
+  logic stall_counter_valid = 1; // always be ready to count a stall
+  logic stall_counter_yumi = 0; // only count up for stalls (no deques)
 
-  always_ff @(negedge clk_i)
-    begin
-      if (~reset_i & ~freeze_i & commit_pkt_r.instret)
-        $fwrite(file, "%0d,%x,%x,%x,%s", cycle_cnt, x_cord_li, y_cord_li, commit_pkt_r.pc, "instr");
-      else if (~reset_i & ~freeze_i)
-        $fwrite(file, "%0d,%x,%x,%x,%s", cycle_cnt, x_cord_li, y_cord_li, commit_pkt_r.pc, stall_reason_enum.name());
+  genvar k;
+  localparam num_stall_reasons = 24; // $bits(bp_stall_reason_s);
 
-      if (~reset_i & ~freeze_i)
-        $fwrite(file, "\n");
-    end
+  wire [`BSG_WIDTH(4)-1:0]    stall_ctrs;
+  logic [num_stall_reasons-1:0][32-1:0] stall_cnt_r;
 
-  // `ifndef VERILATOR
-  final
-    begin
-      $fwrite(file, "=============================\n");
-      $fwrite(file, "Total Stalls:\n");
-      foreach (stall_hist[i])
-        $fwrite(file, "%s: %0d\n", i.name, stall_hist[i]);
-    end
-  // `endif
+  wire [num_stall_reasons-1:0]  stall_reason_sel_one_hot;
 
+  bsg_decode_with_v #(.num_out_p(num_stall_reasons)) decode_stall_reason
+         (.i(stall_reason_enum)
+          ,.v_i(~reset_li & ~commit_pkt_r.instret)
+          ,.o(stall_reason_sel_one_hot)
+          );
+
+  for (k=0; k < num_stall_reasons; k++)
+    begin: cnt_stalls  
+      
+      bsg_flow_counter #(.els_p(400)
+                        ,.count_free_p(0) // count number of elements
+       	           ) bfc_i
+        (.clk_i(clk_i)
+         ,.reset_i(reset_i)
+         ,.v_i(stall_counter_valid)
+         ,.ready_i(~reset_i & ~freeze_i & ~commit_pkt_r.instret & stall_reason_sel_one_hot[k])
+         ,.yumi_i(stall_counter_yumi)
+         ,.count_o(stall_cnt_r[k])
+         );
+    end // block: cnt_stalls
+  
 endmodule
 

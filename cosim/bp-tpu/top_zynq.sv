@@ -173,7 +173,8 @@ module top_zynq
                        , mem_profiler_r[63:32]
                        , mem_profiler_r[31:0]
                        , blackparrot.unicore.unicore_lite.core_minimal.be.calculator.pipe_sys.csr.minstret_lo[63:32]
-                       , blackparrot.unicore.unicore_lite.core_minimal.be.calculator.pipe_sys.csr.minstret_lo[31:0]}
+                       , blackparrot.unicore.unicore_lite.core_minimal.be.calculator.pipe_sys.csr.minstret_lo[31:0]
+		       , top.top_fpga_inst.blackparrot.unicore.unicore_lite.core_minimal.core_profiler.stall_cnt_r}
                      )
 
         ,.pl_to_ps_fifo_data_i (pl_to_ps_fifo_data_li)
