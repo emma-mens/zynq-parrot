@@ -168,14 +168,15 @@ module top_zynq
         // to increment the counters.
         //
 
-        ,.csr_data_i({ mem_profiler_r[127:96]
-                       , mem_profiler_r[95:64]
-                       , mem_profiler_r[63:32]
-                       , mem_profiler_r[31:0]
+        ,.csr_data_i({ 
+		      blackparrot.unicore.unicore_lite.core_minimal.core_profiler.stall_cnt_r[9][31:0] // mul dep
+		      , blackparrot.unicore.unicore_lite.core_minimal.core_profiler.stall_cnt_r[6][31:0] // dcache miss
+		       , blackparrot.unicore.unicore_lite.core_minimal.core_profiler.stall_cnt_r[5][31:0] // dcache rollback
+		       , blackparrot.unicore.unicore_lite.core_minimal.core_profiler.stall_cnt_r[20][31:0] // icache miss
+		       , blackparrot.unicore.unicore_lite.core_minimal.core_profiler.stall_cnt_r[19][31:0] // icache rollback
                        , blackparrot.unicore.unicore_lite.core_minimal.be.calculator.pipe_sys.csr.minstret_lo[63:32]
                        , blackparrot.unicore.unicore_lite.core_minimal.be.calculator.pipe_sys.csr.minstret_lo[31:0]
-		       , top.top_fpga_inst.blackparrot.unicore.unicore_lite.core_minimal.core_profiler.stall_cnt_r}
-                     )
+	       })
 
         ,.pl_to_ps_fifo_data_i (pl_to_ps_fifo_data_li)
         ,.pl_to_ps_fifo_v_i    (pl_to_ps_fifo_v_li)
@@ -520,4 +521,5 @@ module top_zynq
       ,.axi_rvalid_i (m00_axi_rvalid)
       ,.axi_rready_o (m00_axi_rready)
       );
+
 endmodule

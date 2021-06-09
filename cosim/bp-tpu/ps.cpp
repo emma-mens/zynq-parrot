@@ -269,12 +269,17 @@ int main(int argc, char **argv) {
     printf("ps.cpp: wall clock time                : %'16llu (%16llx) ns\n",diff_ns,diff_ns);
     printf("ps.cpp: sim/emul speed                 : %'16.2f BP cycles per minute\n", mtime_delta*8/((double) (diff_ns) / (60.0*1000.0*1000.0*1000.0)));
 
-    printf("ps.cpp: BP DRAM USAGE MASK (each bit is 8 MB): %-8.8x%-8.8x%-8.8x%-8.8x\n"
-           , zpl->axil_read(0x2C + GP0_ADDR_BASE)
-           , zpl->axil_read(0x28 + GP0_ADDR_BASE)
-           , zpl->axil_read(0x24 + GP0_ADDR_BASE)
-           , zpl->axil_read(0x20 + GP0_ADDR_BASE)
-      );
+    // printf("ps.cpp: BP DRAM USAGE MASK (each bit is 8 MB): %-8.8x%-8.8x%-8.8x%-8.8x\n"
+    //        , zpl->axil_read(0x2C + GP0_ADDR_BASE)
+    //        , zpl->axil_read(0x28 + GP0_ADDR_BASE)
+    //        , zpl->axil_read(0x24 + GP0_ADDR_BASE)
+    //        , zpl->axil_read(0x20 + GP0_ADDR_BASE)
+    //   );
+    printf("ps.cpp: mul dep: %-8.8x\n", zpl->axil_read(0x30 + GP0_ADDR_BASE));
+    printf("ps.cpp: dcache miss: %-8.8x\n", zpl->axil_read(0x2C + GP0_ADDR_BASE));
+    printf("ps.cpp: dcache rollback: %-8.8x\n", zpl->axil_read(0x28 + GP0_ADDR_BASE));
+    printf("ps.cpp: icache miss: %-8.8x\n", zpl->axil_read(0x24 + GP0_ADDR_BASE));
+    printf("ps.cpp: icache rollback: %-8.8x\n", zpl->axil_read(0x20 + GP0_ADDR_BASE));
 #ifdef FPGA
     // in general we do not want to free the dram; the Xilinx allocator has a tendency to
     // fail after many allocate/fail cycle. instead we keep a pointer to the dram in a CSR

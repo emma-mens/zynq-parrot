@@ -245,58 +245,6 @@ module top
       ,.axi_rready_i  (m00_axi_rready)
       );
 
-   bind bp_core_minimal
-     bp_core_profiler
-      #(.bp_params_p(bp_params_p))
-      core_profiler
-       (.clk_i(top.m00_axi_aclk)
-        ,.reset_i(~top.m00_axi_aresetn)
-        ,.freeze_i(be.calculator.pipe_sys.csr.cfg_bus_cast_i.freeze)
-
-        ,.mhartid_i(be.calculator.pipe_sys.csr.cfg_bus_cast_i.core_id)
-
-        ,.fe_wait_stall(fe.is_wait)
-        ,.fe_queue_stall(~fe.fe_queue_ready_i)
-
-        ,.itlb_miss(fe.itlb_miss_r)
-        ,.icache_miss(~fe.icache.ready_o)
-        ,.icache_rollback(fe.icache_miss)
-        ,.icache_fence(fe.icache.fencei_req)
-        ,.branch_override(fe.pc_gen.ovr_taken & ~fe.pc_gen.ovr_ret)
-        ,.ret_override(fe.pc_gen.ovr_ret)
-
-        ,.fe_cmd(fe.fe_cmd_yumi_o & ~fe.attaboy_v)
-        ,.fe_cmd_fence(be.director.suppress_iss_o)
-
-        ,.mispredict(be.director.npc_mismatch_v)
-
-        ,.dtlb_miss(be.calculator.pipe_mem.dtlb_miss_v)
-        ,.dcache_miss(~be.calculator.pipe_mem.dcache.ready_o)
-        ,.dcache_rollback(be.scheduler.commit_pkt_cast_i.rollback)
-        ,.long_haz(be.detector.long_haz_v)
-        ,.exception(be.director.commit_pkt_cast_i.exception)
-        ,.eret(be.director.commit_pkt_cast_i.eret)
-        ,._interrupt(be.director.commit_pkt_cast_i._interrupt)
-        ,.control_haz(be.detector.control_haz_v)
-        ,.data_haz(be.detector.data_haz_v)
-        ,.load_dep((be.detector.dep_status_r[0].emem_iwb_v
-                    | be.detector.dep_status_r[0].fmem_iwb_v
-                    | be.detector.dep_status_r[1].fmem_iwb_v
-                    | be.detector.dep_status_r[0].emem_fwb_v
-                    | be.detector.dep_status_r[0].fmem_fwb_v
-                    | be.detector.dep_status_r[1].fmem_fwb_v
-                    ) & be.detector.data_haz_v
-                   )
-        ,.mul_dep((be.detector.dep_status_r[0].mul_iwb_v
-                   | be.detector.dep_status_r[1].mul_iwb_v
-                   | be.detector.dep_status_r[2].mul_iwb_v
-                   ) & be.detector.data_haz_v
-                  )
-        ,.struct_haz(be.detector.struct_haz_v)
-        ,.reservation(be.calculator.reservation_n)
-        ,.commit_pkt(be.calculator.commit_pkt_cast_o)
-   );
-
    initial
      begin
         if ($test$plusargs("bsg_trace") != 0)

@@ -69,6 +69,7 @@ top: run
 flist.vcs: ../../import/black-parrot/bp_top/syn/flist.vcs Makefile
 	cp $< $@
 	echo "../bp_unicore_axi_sim.sv" >> flist.vcs
+	echo "../bp_core_profiler.sv" >> flist.vcs
 	echo "../bp_to_axi_decoder.sv" >> flist.vcs
 	echo "\$$BSG_ZYNQ_PL_SHELL_DIR/bsg_zynq_pl_shell.v" >> flist.vcs
 	echo "../top_zynq.sv" >> flist.vcs

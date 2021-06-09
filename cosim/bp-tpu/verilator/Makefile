@@ -15,6 +15,7 @@ export BP_TOP_DIR       = $(BLACKPARROT_DIR)/bp_top
 export BP_EXTERNAL_DIR  = $(BLACKPARROT_DIR)/external
 export BASEJUMP_STL_DIR = $(BP_EXTERNAL_DIR)/basejump_stl
 export HARDFLOAT_DIR    = $(BP_EXTERNAL_DIR)/HardFloat
+export TINY_TPU_DIR = := $(abspath ..)
 
 
 ifeq ($(shell /usr/bin/arch),armv7l)
@@ -59,20 +60,23 @@ SKIP_DRAM=-DSKIP_DRAM_TESTING
 
 TRACE=--trace-fst --trace-structs
 
-
 # You need to configure these parameters for your particular accelerator!
 
-THE_FLAGS = -DGP0_ADDR_BASE=0x40000000U -DGP0_ADDR_SIZE_BYTES=4096 -DGP1_ADDR_BASE=0x80000000U -DGP1_ADDR_SIZE_BYTES=0x30000000U $(INCLUDES) -DBSG_ENABLE_S01  $(SKIP_DRAM)
+THE_FLAGS = -DGP0_ADDR_BASE=0x40000000U -DGP0_ADDR_SIZE_BYTES=4096 -DGP1_ADDR_BASE=0x80000000U -DGP1_ADDR_SIZE_BYTES=0x40000000U $(INCLUDES) -DBSG_ENABLE_S01  $(SKIP_DRAM)
 
 top: run
 
 flist.vcs: ../../import/black-parrot/bp_top/syn/flist.vcs Makefile
 	cp $< $@
 	echo "../bp_unicore_axi_sim.sv" >> flist.vcs
+	echo "../bp_core_profiler.sv" >> flist.vcs
+	echo "../bp_core_minimal.sv" >> flist.vcs
 	echo "../bp_to_axi_decoder.sv" >> flist.vcs
 	echo "\$$BSG_ZYNQ_PL_SHELL_DIR/bsg_zynq_pl_shell.v" >> flist.vcs
 	echo "../top_zynq.sv" >> flist.vcs
 	echo "top.v" >> flist.vcs
+	# echo "/home/emazuh/class/zynq-parrot/cosim/bp-tpu/tinyTPU/src/vhdl/SDS/TB_SYSTOLIC_DATA_SETUP.vhdl" >> flist.vcs
+	#cat ../tinyTPU/tinyTPU.vcs >> flist.vcs
 
 obj_dir/V$(TOP):  $(HOST-PROGRAM) flist.vcs
 	$(VERILATOR) $(VV_OPTS) -sv -CFLAGS "$(THE_FLAGS)" $(TRACE)  -exe $< 2>&1 | tee build.log
