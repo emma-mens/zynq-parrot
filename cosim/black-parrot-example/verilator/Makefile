@@ -62,7 +62,7 @@ TRACE=--trace-fst --trace-structs
 
 # You need to configure these parameters for your particular accelerator!
 
-THE_FLAGS = -DGP0_ADDR_BASE=0x40000000U -DGP0_ADDR_SIZE_BYTES=0x40000000U -DGP1_ADDR_BASE=0x80000000U -DGP1_ADDR_SIZE_BYTES=0x40000000U $(INCLUDES) -DBSG_ENABLE_S01  $(SKIP_DRAM)
+THE_FLAGS = -DGP0_ADDR_BASE=0x40000000U -DGP0_ADDR_SIZE_BYTES=0x3FFFFFFFU -DGP1_ADDR_BASE=0x80000000U -DGP1_ADDR_SIZE_BYTES=0x3FFFFFFFU $(INCLUDES) -DBSG_ENABLE_S01  $(SKIP_DRAM)
 
 top: run
 
@@ -70,6 +70,7 @@ flist.vcs: ../../import/black-parrot/bp_top/syn/flist.vcs Makefile
 	cp $< $@
 	echo "../bp_unicore_axi_sim.sv" >> flist.vcs
 	echo "../bp_core_profiler.sv" >> flist.vcs
+	echo "../bp_core_minimal.sv" >> flist.vcs
 	echo "../bp_to_axi_decoder.sv" >> flist.vcs
 	echo "\$$BSG_ZYNQ_PL_SHELL_DIR/bsg_zynq_pl_shell.v" >> flist.vcs
 	echo "../top_zynq.sv" >> flist.vcs
