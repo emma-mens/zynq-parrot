@@ -6,4 +6,4 @@ See the [other examples](https://github.com/black-parrot-hdk/zynq-parrot/tree/mu
 ### Note:
 Comment out `# $BP_TOP_DIR/src/v/bp_core_minimal.sv` in the flist.vcs file
 
-To change the matrix width for the matmult tests, first clean the software directory, then initialize the beebs submodule within `black-parrot-sdk`. Modify the required [value](https://github.com/mageec/beebs/blob/master/src/matmult/matmult.c#L54) before building tools and beebs in the software directory.
+To change the matrix width for the matmult tests, first clean the software directory, then initialize the beebs submodule within `black-parrot-sdk`. Modify the required [value](https://github.com/mageec/beebs/blob/master/src/matmult/matmult.c#L54) before building tools and beebs in the software directory or alternatively, replace that matmult file with the one generated in this directory for quicker nbf generation (pre-built arrays).
