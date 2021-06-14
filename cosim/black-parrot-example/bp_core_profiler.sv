@@ -262,24 +262,24 @@ module bp_core_profiler
 
   wire reset_li = reset_i | freeze_i;
 
-  logic stall_counter_valid = 1; // always be ready to count a stall
-  logic stall_counter_yumi = 0; // only count up for stalls (no deques)
+  logic stall_counter_valid = 1; // count up stall
+  logic stall_counter_yumi = 1; // count down stalls 
 
   genvar k;
-  localparam num_stall_reasons = 24; // $bits(bp_stall_reason_s);
+  localparam num_stall_reasons_lp = 24; // $bits(bp_stall_reason_s);
 
   wire [`BSG_WIDTH(4)-1:0]    stall_ctrs;
-  logic [num_stall_reasons-1:0][32-1:0] stall_cnt_r;
+  logic [num_stall_reasons_lp-1:0][32-1:0] stall_cnt_r;
 
-  wire [num_stall_reasons-1:0]  stall_reason_sel_one_hot;
+  wire [num_stall_reasons_lp-1:0]  stall_reason_sel_one_hot;
 
-  bsg_decode_with_v #(.num_out_p(num_stall_reasons)) decode_stall_reason
+  bsg_decode_with_v #(.num_out_p(num_stall_reasons_lp)) decode_stall_reason
          (.i(stall_reason_enum)
           ,.v_i(~reset_li & ~commit_pkt_r.instret)
           ,.o(stall_reason_sel_one_hot)
           );
 
-  for (k=0; k < num_stall_reasons; k++)
+  for (k=0; k < num_stall_reasons_lp; k++)
     begin: cnt_stalls  
       
       bsg_flow_counter #(.els_p(1 << 31)
@@ -287,9 +287,9 @@ module bp_core_profiler
        	           ) bfc_i
         (.clk_i(clk_i)
          ,.reset_i(reset_i)
-         ,.v_i(stall_counter_valid)
+         ,.v_i(stall_counter_valid) // always be ready to count a stall
          ,.ready_i(~reset_i & ~freeze_i & ~commit_pkt_r.instret & stall_reason_sel_one_hot[k])
-         ,.yumi_i(stall_counter_yumi)
+         ,.yumi_i(~stall_counter_yumi) // only count up for stalls (no deques)
          ,.count_o(stall_cnt_r[k])
          );
     end // block: cnt_stalls
