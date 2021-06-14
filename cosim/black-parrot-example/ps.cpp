@@ -282,6 +282,7 @@ int main(int argc, char **argv) {
     // assert( (zpl->axil_read(0x28 + GP0_ADDR_BASE) == 0x18)); // dcache rollback
     // assert( (zpl->axil_read(0x24 + GP0_ADDR_BASE) == 0x114)); // icache miss
     // assert( (zpl->axil_read(0x20 + GP0_ADDR_BASE) == 0x3e)); // icache rollback
+    printf("ps.cpp: mem dep : %-8.8x\n", zpl->axil_read(0x30 + GP0_ADDR_BASE));
     printf("ps.cpp: dcache miss: %-8.8x\n", zpl->axil_read(0x2C + GP0_ADDR_BASE));
     printf("ps.cpp: dcache rollback: %-8.8x\n", zpl->axil_read(0x28 + GP0_ADDR_BASE));
     printf("ps.cpp: icache miss: %-8.8x\n", zpl->axil_read(0x24 + GP0_ADDR_BASE));
